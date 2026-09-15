@@ -244,15 +244,21 @@ def start_health_server():
     server.serve_forever()
 
 
+RUN_ONCE = os.environ.get('RUN_ONCE', '').lower() == 'true'
+
+
 def run():
     logger.info("=== Iniciando Bot Freedom - obatatoide ===")
     logger.info(f"Servidor: {BASE_URL}")
     logger.info(f"Usuário: {NICKNAME}")
-    logger.info(f"Intervalo: {POST_INTERVAL_SECONDS} segundos ({POST_INTERVAL_SECONDS / 60:.1f} minutos)")
 
-    # Inicia o servidor de health-check em background (necessário pro Koyeb)
-    health_thread = threading.Thread(target=start_health_server, daemon=True)
-    health_thread.start()
+    if RUN_ONCE:
+        logger.info("Modo: GitHub Actions (posta 1 piada e encerra)")
+    else:
+        logger.info(f"Modo: Contínuo | Intervalo: {POST_INTERVAL_SECONDS}s ({POST_INTERVAL_SECONDS / 60:.1f} min)")
+        # Inicia o servidor de health-check em background (necessário pro Koyeb/servidores)
+        health_thread = threading.Thread(target=start_health_server, daemon=True)
+        health_thread.start()
 
     jokes = load_cache()
     if not jokes:
@@ -272,7 +278,7 @@ def run():
         available_jokes = [j for j in jokes if j['hash'] not in posted_history]
 
         if not available_jokes:
-            logger.info("Todas as piadas da lista já foram postadas! Resetando histórico para reiniciar o ciclo...")
+            logger.info("Todas as piadas já foram postadas! Resetando histórico para reiniciar o ciclo...")
             posted_history.clear()
             save_history(posted_history)
             available_jokes = jokes
@@ -282,7 +288,7 @@ def run():
         joke_text = selected_joke['text']
         joke_hash = selected_joke['hash']
 
-        logger.info(f"\n--- Preparando post (Ano {selected_joke.get('year')}, {len(joke_text)} caracteres) ---")
+        logger.info(f"\n--- Preparando post (Ano {selected_joke.get('year')}, {len(joke_text)} chars) ---")
         preview = joke_text.replace('\n', ' ')
         if len(preview) > 80:
             preview = preview[:77] + '...'
@@ -296,9 +302,14 @@ def run():
         else:
             logger.warning("Não foi possível enviar a piada nesta tentativa. Tentará novamente no próximo ciclo.")
 
+        if RUN_ONCE:
+            logger.info("Modo RUN_ONCE: encerrando após 1 post.")
+            break
+
         logger.info(f"Aguardando {POST_INTERVAL_SECONDS} segundos até a próxima postagem...\n")
         time.sleep(POST_INTERVAL_SECONDS)
 
 
 if __name__ == '__main__':
     run()
+

@@ -1,0 +1,39 @@
+name: Freedom Bot - obatatoide
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Roda a cada 5 minutos (mínimo do GitHub Actions)
+  workflow_dispatch:        # Permite rodar manualmente pelo painel do GitHub
+
+jobs:
+  post-joke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Restaurar histórico de posts (cache)
+        uses: actions/cache@v4
+        with:
+          path: posted_history.json
+          key: posted-history-${{ github.run_id }}
+          restore-keys: |
+            posted-history-
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Rodar o bot (posta 1 piada e encerra)
+        env:
+          FREEDOM_URL: ${{ vars.FREEDOM_URL || 'https://freedom-0yku.onrender.com' }}
+          FREEDOM_NICKNAME: ${{ vars.FREEDOM_NICKNAME || 'obatatoide' }}
+          RUN_ONCE: "true"
+        run: python bot.py
+
+      - name: Salvar histórico atualizado
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: posted_history.json
+          key: posted-history-${{ github.run_id }}
