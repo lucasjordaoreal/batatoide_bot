@@ -11,6 +11,8 @@ import json
 import random
 import hashlib
 import logging
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from html import unescape
 import requests
 from bs4 import BeautifulSoup
@@ -224,11 +226,33 @@ class FreedomBot:
             return False
 
 
+def start_health_server():
+    """Sobe um servidor HTTP mínimo para satisfazer o health check do Koyeb."""
+    port = int(os.environ.get('PORT', 8000))
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'OK')
+
+        def log_message(self, format, *args):  # silencia logs do HTTP
+            pass
+
+    server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    logger.info(f"Health-check server rodando na porta {port}")
+    server.serve_forever()
+
+
 def run():
     logger.info("=== Iniciando Bot Freedom - obatatoide ===")
     logger.info(f"Servidor: {BASE_URL}")
     logger.info(f"Usuário: {NICKNAME}")
     logger.info(f"Intervalo: {POST_INTERVAL_SECONDS} segundos ({POST_INTERVAL_SECONDS / 60:.1f} minutos)")
+
+    # Inicia o servidor de health-check em background (necessário pro Koyeb)
+    health_thread = threading.Thread(target=start_health_server, daemon=True)
+    health_thread.start()
 
     jokes = load_cache()
     if not jokes:
